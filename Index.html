@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>Mystery Love Island</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;color:#fff;font-family:Georgia,serif}
+button,input{font:inherit}
+button{cursor:pointer}
+#game{position:fixed;inset:0;background:#000}
+#scene{position:absolute;inset:0}
+#scene img{width:100%;height:100%;display:block;object-fit:cover;object-position:center}
+#shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.28),transparent 30%,transparent 65%,rgba(0,0,0,.42));pointer-events:none}
+#hud{position:absolute;z-index:10;top:env(safe-area-inset-top);left:0;right:0;display:flex;justify-content:space-between;padding:12px 14px;font:bold 16px system-ui;text-shadow:0 2px 5px #000}
+#keys{color:#f4cf68}
+#dialog{position:absolute;z-index:30;left:50%;bottom:24px;transform:translateX(-50%);width:min(92vw,760px);background:rgba(9,22,31,.96);border:2px solid #f4cf68;border-radius:16px;padding:17px 58px 17px 18px;font:17px/1.45 system-ui;box-shadow:0 8px 25px #000}
+#dialogNext{position:absolute;right:5px;top:50%;transform:translateY(-50%);border:0;background:none;color:#fff;font-size:42px}
+.overlay{position:absolute;z-index:50;inset:0;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(0,0,0,.68)}
+.card{width:min(92vw,700px);max-height:90vh;overflow:auto;border:3px solid #c89b55;border-radius:18px;background:#4e2c19;padding:25px;color:#fff;text-align:center;box-shadow:0 15px 45px #000}
+.card h1{font-size:clamp(30px,8vw,54px);margin:5px 0 15px;color:#f4cf68}
+.card h2{font-size:clamp(21px,5vw,31px);line-height:1.35}
+.card p{font:16px/1.5 system-ui}
+.gold{border:2px solid #f4cf68;background:#7b4a27;color:#fff;border-radius:12px;padding:13px 20px;font-weight:900}
+.answers{display:flex;flex-direction:column;gap:10px;margin-top:18px}
+.answer{border:2px solid #c89b55;background:#17242c;color:#fff;border-radius:11px;padding:13px;text-align:left}
+.answer:active,.gold:active{transform:scale(.98)}
+.feedback{min-height:28px;margin-top:12px;font:900 16px system-ui}
+.good{color:#baf5c2}.bad{color:#ffaaa5}
+.hidden{display:none!important}
+#memoryList{display:flex;flex-direction:column;gap:12px;margin:18px 0;text-align:left}
+.memory{border:1px solid #f4cf68;background:#ffffff10;border-radius:12px;padding:14px;font:16px/1.45 system-ui}
+.memory b{color:#f4cf68}
+#rewardOverlay .card{background:#10222f}
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="scene"><img id="sceneImage" alt=""></div>
+  <div id="shade"></div>
+  <div id="hud"><span>MYSTERY LOVE ISLAND</span><span>🗝️ <b id="keyCount">0</b>/20</span></div>
+
+  <div id="dialog" class="hidden">
+    <span id="dialogText"></span>
+    <button id="dialogNext" aria-label="Continuer">›</button>
+  </div>
+
+  <div id="questionOverlay" class="overlay hidden">
+    <div class="card">
+      <div id="questionNumber"></div>
+      <h2 id="questionText"></h2>
+      <div id="answers" class="answers"></div>
+      <div id="feedback" class="feedback"></div>
+      <button id="retry" class="gold hidden">Réessayer</button>
+    </div>
+  </div>
+
+  <div id="memoryOverlay" class="overlay hidden">
+    <div class="card">
+      <h1>Le coffre est ouvert</h1>
+      <p>Les souvenirs cachés derrière les 20 clés apparaissent maintenant.</p>
+      <div id="memoryList"></div>
+      <button id="rewardButton" class="gold">Découvre ta récompense</button>
+    </div>
+  </div>
+
+  <div id="rewardOverlay" class="overlay hidden">
+    <div class="card">
+      <h1>Découvre ta récompense</h1>
+      <p>Appuie sur le bouton pour continuer.</p>
+      <button id="goReward" class="gold">Découvre ta récompense</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/*
+  IMPORTANT :
+  Toutes les images sont à la RACINE du dépôt GitHub.
+  Aucun dossier "images/" n'est utilisé.
+*/
+const ROOT = "";
+
+const scenes = [
+  "01_la_plage.jpg",
+  "02_la_bouteille.jpg",
+  "03_la_carte.jpg",
+  "04_le_grand_panorama.jpg",
+  "05_la_crique.jpg",
+  "06_le_temple_de_la_source.jpg",
+  "07_le_premier_pont.jpg",
+  "08_les_ruines_suspendues.jpg",
+  "09_le_sanctuaire.jpg",
+  "10_la_vallee_oubliee.jpg",
+  "11_la_cascade_sacree.jpg",
+  "12_le_temple_interieur.jpg",
+  "13_le_village_abandonne.jpg",
+  "14_la_montagne_de_feu.jpg",
+  "15_le_temple_du_coucher_du_soleil.jpg",
+  "16_le_pont_des_souvenirs.jpg",
+  "17_le_grand_lac.jpg",
+  "18_la_vallee_finale.jpg",
+  "19_la_porte_ancienne.jpg",
+  "20_le_dernier_temple.jpg",
+  "21_la_derniere_enigme.jpg",
+  "22_le_bateau_echoue.jpg",
+  "23_linterieur_du_bateau.jpg",
+  "24_le_coffre.jpg"
+];
+
+const questions = [
+ {q:"Combien font 11 + 2 ?", a:["13","12","14","15"], ok:0},
+ {q:"Quel monument religieux se trouve sur les hauteurs de Lyon ?", a:["Fourvière","Notre-Dame de Paris","La cathédrale de Reims","Le Sacré-Cœur"], ok:0},
+ {q:"Quel célèbre chanteur interprète le titre « Perfect » ?", a:["Ed Sheeran","Stromae","Bruno Mars","Justin Timberlake"], ok:0},
+ {q:"Combien font 17 − 11 ?", a:["5","6","7","8"], ok:1},
+ {q:"De quel pays est originaire la poutine ?", a:["Canada","France","États-Unis","Belgique"], ok:0},
+ {q:"Qui est l’interprète du titre « Love Me Like You Do » ?", a:["Ellie Goulding","Adele","Taylor Swift","Dua Lipa"], ok:0},
+ {q:"Dans quel film peut-on voir un homme raconter une belle histoire d’amour à une femme atteinte d’Alzheimer ?", a:["N’oublie jamais","Titanic","The Holiday","PS : I Love You"], ok:0},
+ {q:"Combien font 1 + 20 − 2 ?", a:["18","19","20","21"], ok:1},
+ {q:"Quel est le plus grand titre du groupe Goo Goo Dolls ?", a:["Iris","Slide","Name","Black Balloon"], ok:0},
+ {q:"À quelle période retrouve-t-on les sapins, les guirlandes et les cadeaux ?", a:["Noël","Pâques","Halloween","L’été"], ok:0},
+ {q:"Combien font 29 − 26 ?", a:["2","3","4","5"], ok:1},
+ {q:"Près de quel pays peut-on visiter la petite île de Saona ?", a:["Punta Cana","Cancún","Miami","Cuba"], ok:0},
+ {q:"Quel dessert est fait principalement à base de fromage frais et de gâteau concassé ?", a:["Cheesecake","Tiramisu","Mousse au chocolat","Crème brûlée"], ok:0},
+ {q:"À quel aliment Susan compare Mike dans Desperate Housewives ?", a:["Petit pois","Carotte","Haricot","Maïs"], ok:0},
+ {q:"Dans quelle série peut-on retrouver 6 amis dans un appartement new-yorkais ?", a:["Friends","How I Met Your Mother","The Big Bang Theory","Seinfeld"], ok:0},
+ {q:"Où peut-on trouver plusieurs étoiles et un lit ?", a:["Hôtel","Cinéma","Restaurant","Musée"], ok:0},
+ {q:"Quel endroit est célèbre pour la magie et sa souris ?", a:["Disneyland","Universal Studios","Le Louvre","Central Park"], ok:0},
+ {q:"En quelle année la France a-t-elle remporté sa dernière Coupe du monde ?", a:["2018","2014","2020","2022"], ok:0},
+ {q:"Quel est le jour avant le 1er décembre ?", a:["30 novembre","29 novembre","1er novembre","31 décembre"], ok:0},
+ {q:"Qui est le mari le plus incroyable et amoureux de la planète ?", a:["Alan","Brad Pitt","Ryan Reynolds","Le Père Noël"], ok:0}
+];
+
+const memories = [
+ "Votre date de couple.",
+ "Fourvière : lieu de votre premier rendez-vous et de la demande en mariage.",
+ "Ed Sheeran : votre chanteur préféré et la musique d’ouverture de bal de votre mariage.",
+ "Le mois de votre date de couple.",
+ "Le Canada : votre premier grand voyage.",
+ "Ellie Goulding : pour le prénom de votre deuxième bébé.",
+ "N’oublie jamais : votre film romantique préféré.",
+ "Le 19 : le jour de naissance d’Iris.",
+ "Iris : le prénom de votre premier bébé.",
+ "Noël : votre fête préférée.",
+ "Le 3 : le jour de naissance d’Ellie.",
+ "Punta Cana : votre voyage de noces.",
+ "Le cheesecake : son dessert préféré.",
+ "Le petit pois : ton premier surnom qu’elle t’a donné.",
+ "Friends : votre série préférée.",
+ "L’hôtel : là où vous célébrez chaque 13 juin.",
+ "Disneyland : vos sorties préférées.",
+ "2018 : l’année où vous vous êtes mis en couple.",
+ "30 novembre : le jour de votre mariage.",
+ "Alan : le mari le plus incroyable et amoureux de la planète."
+];
+
+const questionSceneIndex = [
+  3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,20,20
+];
+
+let currentQuestion = 0;
+let keys = 0;
+let introStep = 0;
+let mode = "intro";
+
+const img = document.getElementById("sceneImage");
+const dialog = document.getElementById("dialog");
+const dialogText = document.getElementById("dialogText");
+const questionOverlay = document.getElementById("questionOverlay");
+const memoryOverlay = document.getElementById("memoryOverlay");
+const rewardOverlay = document.getElementById("rewardOverlay");
+
+function showScene(index){
+  img.src = ROOT + scenes[index];
+}
+
+function showDialog(text, next){
+  dialogText.textContent = text;
+  dialog.classList.remove("hidden");
+  dialogNext.onclick = next;
+}
+
+function hideDialog(){ dialog.classList.add("hidden"); }
+
+function begin(){
+  showScene(0);
+  showDialog("Bienvenue sur l’île. Quelque chose t’attend sur cette plage.",()=>{
+    hideDialog();
+    showScene(1);
+    showDialog("Une bouteille échouée… Elle contient le premier indice.",()=>{
+      hideDialog();
+      showScene(2);
+      showDialog("Une carte. Elle indique le chemin à suivre.",()=>{
+        hideDialog();
+        mode="questions";
+        currentQuestion=0;
+        showExplorationAndQuestion();
+      });
+    });
+  });
+}
+
+function showExplorationAndQuestion(){
+  const sceneIndex = questionSceneIndex[currentQuestion];
+  showScene(sceneIndex);
+  showDialog("Une nouvelle étape de l’exploration… Quand tu es prête, ouvre la question.",()=>{
+    hideDialog();
+    openQuestion();
+  });
+}
+
+function openQuestion(){
+  const item=questions[currentQuestion];
+  document.getElementById("questionNumber").textContent=`QUESTION ${currentQuestion+1} / 20`;
+  document.getElementById("questionText").textContent=item.q;
+  const answers=document.getElementById("answers");
+  const feedback=document.getElementById("feedback");
+  const retry=document.getElementById("retry");
+  answers.innerHTML="";
+  feedback.textContent="";
+  retry.classList.add("hidden");
+
+  item.a.forEach((answer,i)=>{
+    const b=document.createElement("button");
+    b.className="answer";
+    b.textContent=answer;
+    b.onclick=()=>validate(i);
+    answers.appendChild(b);
+  });
+  questionOverlay.classList.remove("hidden");
+}
+
+function validate(choice){
+  const item=questions[currentQuestion];
+  const feedback=document.getElementById("feedback");
+  if(choice!==item.ok){
+    feedback.textContent="Ce n’est pas la bonne réponse. Réessaie.";
+    feedback.className="feedback bad";
+    return;
+  }
+
+  keys++;
+  document.getElementById("keyCount").textContent=keys;
+  feedback.textContent="Bonne réponse ! 🗝️ Une clé est obtenue.";
+  feedback.className="feedback good";
+  document.querySelectorAll(".answer").forEach(b=>b.disabled=true);
+
+  const next=document.createElement("button");
+  next.className="gold";
+  next.textContent=currentQuestion===19 ? "Continuer vers le coffre" : "Scène suivante";
+  next.style.marginTop="14px";
+  next.onclick=()=>{
+    questionOverlay.classList.add("hidden");
+    if(currentQuestion<19){
+      currentQuestion++;
+      showExplorationAndQuestion();
+    }else{
+      goToChest();
+    }
+  };
+  document.querySelector(".card",questionOverlay);
+  document.querySelector("#answers").after(next);
+}
+
+function goToChest(){
+  showScene(21);
+  showDialog("Le bateau échoué est devant toi.",()=>{
+    hideDialog();
+    showScene(22);
+    showDialog("Tu entres dans le bateau. Le coffre est là.",()=>{
+      hideDialog();
+      showScene(23);
+      showDialog("Le coffre est devant toi. Tu as réuni les 20 clés.",()=>{
+        hideDialog();
+        revealMemories();
+      });
+    });
+  });
+}
+
+function revealMemories(){
+  const list=document.getElementById("memoryList");
+  list.innerHTML="";
+  memories.forEach((m,i)=>{
+    const div=document.createElement("div");
+    div.className="memory";
+    div.innerHTML=`<b>Souvenir ${i+1}</b><br>${m}`;
+    list.appendChild(div);
+  });
+  memoryOverlay.classList.remove("hidden");
+}
+
+document.getElementById("rewardButton").onclick=()=>{
+  memoryOverlay.classList.add("hidden");
+  rewardOverlay.classList.remove("hidden");
+};
+
+document.getElementById("goReward").onclick=()=>{
+  window.location.href="https://alanmartinpresta-lang.github.io/Celena-app/";
+};
+
+document.addEventListener("DOMContentLoaded",begin);
+</script>
+</body>
+</html>
